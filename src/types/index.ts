@@ -35,11 +35,15 @@ export type SubtopicLevelCounts = {
 export type SubtopicQuestionRule = {
   topic: string;
   subtopic: string;
+  /** Set when selection logic spans multiple subjects */
+  subject?: string;
   levelCounts: SubtopicLevelCounts[];
 };
 
 export type QuestionSelectionLogic = {
   subject: string;
+  /** Practice / overall tests may select multiple subjects */
+  subjects?: string[];
   topics: string[];
   subtopics: string[];
   subtopicRules: SubtopicQuestionRule[];
@@ -53,6 +57,7 @@ export type ScheduleSlotState = {
   assignStatus: SlotAssignStatus;
   triggeredAt?: string | null;
   triggeredTime?: string | null;
+  assignedTestName?: string | null;
 };
 
 export type ScheduleQuestionConfig = {

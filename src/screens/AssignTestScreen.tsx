@@ -50,9 +50,14 @@ import {
 import type { QuestionSelectionLogic, ScheduleSlotState, SlotAssignStatus } from "../types";
 import { generateQuestionsFromLogic } from "../utils/questionSelection";
 import {
+  computeDurationFromLevelRules,
+  computeDurationFromSelectionLogic,
+} from "../utils/testDuration";
+import {
   buildSubjectLevelLogic,
   generateQuestionsFromLevelRules,
 } from "../utils/sftGeneration";
+import { formatLogicSubjects } from "../utils/selectionLogicHelpers";
 
 const statusDotStyle = (status: BatchAssignStatus): React.CSSProperties => ({
   width: 10,
@@ -635,8 +640,10 @@ const AssignTestDetail = () => {
   const [generationWarnings, setGenerationWarnings] = useState<string[]>([]);
   const [activeScheduleKey, setActiveScheduleKey] = useState<string | null>(null);
   const [testQuestionLogic, setTestQuestionLogic] =
-    useState<QuestionSelectionLogic | null>(null);
-  const [testLogicSaved, setTestLogicSaved] = useState(false);
+    useState<QuestionSelectionLogic | null>(() => test?.selectionLogic ?? null);
+  const [testLogicSaved, setTestLogicSaved] = useState(
+    () => test?.selectionLogicSaved ?? false
+  );
   const [groupQuestionSets, setGroupQuestionSets] = useState<
     Record<string, ScheduleSlotState>
   >({});
@@ -653,6 +660,8 @@ const AssignTestDetail = () => {
 
   useEffect(() => {
     setBatchConfigs(test?.batches ? [...test.batches] : []);
+    setTestQuestionLogic(test?.selectionLogic ?? null);
+    setTestLogicSaved(test?.selectionLogicSaved ?? false);
   }, [testId, test]);
 
   const courseOptions = COURSES_BY_TRACK_ID[selectedTrack] ?? [];
@@ -667,6 +676,22 @@ const AssignTestDetail = () => {
     () => (test ? buildSubjectLevelLogic(test.subject) : null),
     [test]
   );
+
+  const displayDuration = useMemo(() => {
+    if (isSubjectFinalTest && subjectCompleted) {
+      return computeDurationFromLevelRules(DEFAULT_LEVEL_RULES);
+    }
+    if (testLogicSaved && testQuestionLogic) {
+      const minutes = computeDurationFromSelectionLogic(testQuestionLogic);
+      return minutes > 0 ? minutes : null;
+    }
+    return null;
+  }, [
+    isSubjectFinalTest,
+    subjectCompleted,
+    testLogicSaved,
+    testQuestionLogic,
+  ]);
 
   const emptySlotState = (): ScheduleSlotState => ({
     questionIds: [],
@@ -1067,10 +1092,12 @@ const AssignTestDetail = () => {
                 <VscListFlat />
                 {test.subject}
               </span>
-              <span className="d-inline-flex align-items-center gap-1">
-                <BsClock />
-                {test.duration} Minutes
-              </span>
+              {displayDuration != null && (
+                <span className="d-inline-flex align-items-center gap-1">
+                  <BsClock />
+                  {displayDuration} Minutes
+                </span>
+              )}
               <span className="d-inline-flex align-items-center gap-1">
                 <GiStarShuriken />
                 {test.marks} Marks
@@ -1112,7 +1139,7 @@ const AssignTestDetail = () => {
           </Button>
           {testLogicSaved && testQuestionLogic && (
             <Badge bg="success">
-              Saved · {testQuestionLogic.subject}
+              Saved · {formatLogicSubjects(testQuestionLogic)}
             </Badge>
           )}
           {scheduleGroups.length > 1 && (
@@ -1279,6 +1306,7 @@ const AssignTestDetail = () => {
         scheduleLabel={test.name}
         batchNames={batchConfigs.map((b) => b.batch_name)}
         testSubject={test.subject}
+        testType={test.type}
         initialConfig={
           testQuestionLogic
             ? { logic: testQuestionLogic, logicSaved: testLogicSaved }

@@ -31,17 +31,26 @@ const CreateTestForm = () => {
   }, [track, courseOptions]);
 
   const isSubjectFinalPlaceholder = testType === "Subject Final Test";
+  const isOverallFinalPlaceholder = testType === "Overall Test";
+  const isCoursePlaceholder = isSubjectFinalPlaceholder || isOverallFinalPlaceholder;
 
   const previewName = useMemo(() => {
     if (isSubjectFinalPlaceholder) {
       const courseCode = courses[0] || "12M 2026";
       return `${subject}  - ${courseCode} - FT###`;
     }
+    if (isOverallFinalPlaceholder) {
+      const courseCode = courses[0] || "12M 2026";
+      const subjectForName =
+        subject === "SQL" || subject === "Python" || subject === "DSA"
+          ? "SQL-Python-DSA"
+          : subject;
+      return `OT - ${courseCode} - ### - ${subjectForName}`;
+    }
 
     const courseCode = courses[0] || "12M 2026";
     const subjectForName =
       testType === "Practice Test" ||
-      testType === "Overall Test" ||
       testType === "Employability Test"
         ? subject === "SQL" || subject === "Python" || subject === "DSA"
           ? "SQL-Python-DSA"
@@ -56,7 +65,7 @@ const CreateTestForm = () => {
       periodLabel: testType === "Employability Test" ? "May 2026" : undefined,
       seq: 1,
     });
-  }, [courses, subject, testType, isSubjectFinalPlaceholder]);
+  }, [courses, subject, testType, isSubjectFinalPlaceholder, isOverallFinalPlaceholder]);
 
   const handleCreateTest = (event: React.FormEvent) => {
     event.preventDefault();
@@ -151,12 +160,12 @@ const CreateTestForm = () => {
 
             <div className="mt-3 p-2 bg-light rounded border">
               <div className="text-muted small mb-1">
-                {isSubjectFinalPlaceholder
-                  ? "Course placeholder name (system assigns FT001, FT002… at first assign)"
+                {isCoursePlaceholder
+                  ? "Course placeholder name (system assigns FT001/OT001… at first assign)"
                   : "Auto-generated test name (based on type)"}
               </div>
               <div className="fw-semibold">{previewName}</div>
-              {isSubjectFinalPlaceholder && (
+              {isCoursePlaceholder && (
                 <div className="text-muted small mt-2">
                   Questions and level rules are applied only when this test is
                   assigned to batches. Trainers cannot edit the name.
@@ -173,7 +182,7 @@ const CreateTestForm = () => {
               >
                 {loading ? (
                   <Spinner animation="border" size="sm" />
-                ) : isSubjectFinalPlaceholder ? (
+                ) : isCoursePlaceholder ? (
                   "Add Placeholder to Course"
                 ) : (
                   "Create Test"

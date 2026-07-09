@@ -8,9 +8,12 @@ const SIDEBAR_ITEMS = [
     label: "Tests",
     subMenu: [
       { label: "Create", path: "/create-test" },
+      { label: "Course Config", path: "/course-config" },
       { label: "Assign", path: "/assign-test" },
       { label: "Triggered", path: "/triggered-tests" },
       { label: "Completed", path: "/completed-tests" },
+      { label: "Reports", path: "/test-reports" },
+      { label: "Trainer Performance", path: "/trainer-performance" },
       { label: "Level Rules", path: "/level-rules" },
       { label: "Question Sets", path: "/time-question-sets" },
       { label: "Live Monitor", path: "/live-monitor" },

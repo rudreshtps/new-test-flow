@@ -69,6 +69,39 @@ flowchart TB
 
 **Subject Final Test (SFT)** uses **auto level rules** at assign time, separate **Assign** then **Trigger** steps, and student eligibility rules.
 
+| `/test-reports` | TestReportsScreen | Auto reports + grade bands + email mock |
+| `/trainer-performance` | TrainerPerformanceScreen | Generation limit + unused tracking |
+| `/course-config` | CourseConfigScreen | Course placeholders (no questions until assign) |
+
+---
+
+## Subject Final / Overall Final Test — Spec Implementation (Mock)
+
+| Email / Kannan requirement | Implemented |
+|----------------------------|-------------|
+| Course placeholder only at config | `/course-config`, Create → Add Placeholder |
+| Configure + generate at assign | Level rules + Generate on assign detail |
+| Assign before Trigger | **Assign** then **Trigger** buttons |
+| FT001, FT002 sequential naming | `sessionStorage` sequence on first generate |
+| Subject completed gate | `subjectCompleted` on test mock |
+| Non-editable system name | Badge + no edit icon |
+| No assign to absent / auto-absent 25% | `absent`, `autoAbsent25` student flags |
+| One final per subject per student | `finalTestCompletedSubjects` |
+| Question repeat fallback | `sftGeneration.ts` with reorder/shuffle warning |
+| Flag question + notify roles | `FlagQuestionModal` |
+| Disable if unused / show usage if used | `questionFlagData.ts` |
+| Triggered list (scheduled + trigger times) | `/triggered-tests` |
+| Completed details | `/completed-tests` |
+| Reports + SUN/MOON/STAR/REST | `/test-reports` |
+| Email reports (discussed) | Toggle + Send mock |
+| Trigger/generation limit (10) | `FINAL_TEST_GENERATE_LIMIT` + alerts |
+| Trainer performance (unused generates) | `/trainer-performance` |
+| Overall Final Test same logic | `/assign-test/OT-12M-002` |
+| Disable assign/trigger after all attempted | `allAssignedStudentsAttemptedFinal()` |
+| Delete unused tests | N/A per Kannan — not implemented (by design) |
+
+**Demo:** `/assign-test/FT001` or `/assign-test/OT-12M-002` → batch → students → schedule → Generate → Confirm → Assign → Trigger → Complete → Reports.
+
 ---
 
 ## 2. Routes & Navigation
@@ -219,8 +252,9 @@ flowchart TB
 
 | ID | Type | Status |
 |----|------|--------|
-| `WT001` | Weekly Test | Assigned (2 batches, same schedule) |
+| `PT-12M-001` | Practice Test | Assigned (2 batches, same schedule) |
 | `RT001` | Revision Test | Unassigned |
+| `PT-12M-002` | Practice Test | Unassigned |
 | `FT001` | Subject Final Test | Unassigned |
 | `OT-12M-001` | Overall Test | Assigned |
 | `ET-MAY-001` | Employability Test | Unassigned |
@@ -941,8 +975,8 @@ Tracks, courses by track, subjects, test types, naming prefixes, `buildTestName(
 
 ## 11. Demo Paths
 
-### Weekly test with shared schedule
-1. `/assign-test` → open **WT001**
+### Practice test with shared schedule
+1. `/assign-test` → open **PT-12M-001**
 2. Expand schedule box (Batch-01 + B02, same 2026-07-10 09:00)
 3. Journal icon → set SQL topics/subtopics + counts → **Save Logic**
 4. Shuffle icon → generate → review → **Confirm & Apply**

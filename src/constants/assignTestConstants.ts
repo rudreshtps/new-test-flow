@@ -1,5 +1,11 @@
 /** Assign Test to Batch — mock options */
 
+import type { QuestionSelectionLogic } from "../types";
+import {
+  computeDurationFromLevelRules,
+  computeDurationFromSelectionLogic,
+} from "../utils/testDuration";
+import { DEFAULT_LEVEL_RULES } from "../data/mockData";
 import { CREATE_TEST_TYPES, type CreateTestType } from "./createTestConstants";
 
 export type AssignListStatus = "assigned" | "unassigned" | "partial";
@@ -28,7 +34,6 @@ export type AssignListTest = {
   name: string;
   subject: string;
   type: CreateTestType | string;
-  duration: number;
   marks: number;
   description: string;
   status: AssignListStatus;
@@ -40,6 +45,11 @@ export type AssignListTest = {
   remainingCount?: number;
   track?: string;
   batches?: TestBatchAssignment[];
+  /** Saved during assign — duration is derived from this, not set at create */
+  selectionLogic?: QuestionSelectionLogic;
+  selectionLogicSaved?: boolean;
+  /** Subject / overall final tests use level rules instead of manual selection logic */
+  levelRulesApplied?: boolean;
   /** Subject Final Test: assign enabled only when subject is marked complete in course */
   subjectCompleted?: boolean;
 };
@@ -55,16 +65,34 @@ export type AssignListTest = {
  * Overall Test:       OT - 12M 2026 - 001 - SQL-Python-DSA
  * Employability Test: ET - May 2026 - 001 - SQL-Python-DSA
  */
+export const MOCK_PT_12M_001_LOGIC: QuestionSelectionLogic = {
+  subject: "SQL",
+  topics: ["Query Fundamentals", "Joins & Relations"],
+  subtopics: ["SELECT basics", "Filtering", "INNER JOIN"],
+  subtopicRules: [
+    {
+      topic: "Query Fundamentals",
+      subtopic: "SELECT basics",
+      levelCounts: [
+        { level: 1, mcqCount: 5, codingCount: 2 },
+        { level: 2, mcqCount: 3, codingCount: 3 },
+        { level: 3, mcqCount: 2, codingCount: 5 },
+      ],
+    },
+  ],
+};
+
 export const MOCK_TESTS: AssignListTest[] = [
   {
-    id: "WT001",
-    name: "SQL  - 12M 2026 - WT001",
+    id: "PT-12M-001",
+    name: "PT - 12M 2026 - 001 - SQL",
     subject: "SQL",
-    type: "Weekly Test",
-    duration: 60,
+    type: "Practice Test",
     marks: 50,
-    description: "Weekly test for SQL — 12M 2026 batch.",
+    description: "Practice test for SQL — 12M 2026 batch.",
     status: "assigned",
+    selectionLogic: MOCK_PT_12M_001_LOGIC,
+    selectionLogicSaved: true,
     course: "12M 2026",
     batch: "Batch-01",
     date: "2026-07-10",
@@ -81,7 +109,7 @@ export const MOCK_TESTS: AssignListTest[] = [
         track_id: "it",
         track_name: "IT",
         status: "scheduled",
-        test_type: "Weekly Test",
+        test_type: "Practice Test",
         date: "2026-07-10",
         time: "09:00",
         studentCount: 2,
@@ -97,7 +125,7 @@ export const MOCK_TESTS: AssignListTest[] = [
         track_id: "it",
         track_name: "IT",
         status: "scheduled",
-        test_type: "Weekly Test",
+        test_type: "Practice Test",
         // Same date+time as Batch-01 → shared question set
         date: "2026-07-10",
         time: "09:00",
@@ -113,7 +141,6 @@ export const MOCK_TESTS: AssignListTest[] = [
     name: "SQL  - 12M 2026 - RT001",
     subject: "SQL",
     type: "Revision Test",
-    duration: 45,
     marks: 40,
     description: "Revision test for SQL — 12M 2026 batch.",
     status: "unassigned",
@@ -122,11 +149,10 @@ export const MOCK_TESTS: AssignListTest[] = [
     batches: [],
   },
   {
-    id: "PT-12M-001",
-    name: "PT - 12M 2026 - 001 - SQL-Python-DSA",
+    id: "PT-12M-002",
+    name: "PT - 12M 2026 - 002 - SQL-Python-DSA",
     subject: "SQL-Python-DSA",
     type: "Practice Test",
-    duration: 60,
     marks: 100,
     description: "Practice test covering SQL, Python and DSA.",
     status: "unassigned",
@@ -139,7 +165,6 @@ export const MOCK_TESTS: AssignListTest[] = [
     name: "PT - FYP 2026 - 001 - SQL-Python-DSA",
     subject: "SQL-Python-DSA",
     type: "Practice Test",
-    duration: 60,
     marks: 100,
     description: "Practice test for FYP 2026 — SQL, Python and DSA.",
     status: "partial",
@@ -188,9 +213,21 @@ export const MOCK_TESTS: AssignListTest[] = [
     name: "SQL  - 12M 2026 - FT001",
     subject: "SQL",
     type: "Subject Final Test",
-    duration: 120,
     marks: 100,
     description: "Subject final test for SQL — auto-generated from level rules at assign.",
+    status: "unassigned",
+    course: "12M 2026",
+    track: "IT",
+    subjectCompleted: true,
+    batches: [],
+  },
+  {
+    id: "OT-12M-002",
+    name: "OT - 12M 2026 - 002 - SQL-Python-DSA",
+    subject: "SQL-Python-DSA",
+    type: "Overall Test",
+    marks: 100,
+    description: "Overall final test — auto-generated from level rules at assign.",
     status: "unassigned",
     course: "12M 2026",
     track: "IT",
@@ -202,7 +239,6 @@ export const MOCK_TESTS: AssignListTest[] = [
     name: "OT - 12M 2026 - 001 - SQL-Python-DSA",
     subject: "SQL-Python-DSA",
     type: "Overall Test",
-    duration: 60,
     marks: 100,
     description: "Overall test covering SQL, Python and DSA.",
     status: "assigned",
@@ -236,7 +272,6 @@ export const MOCK_TESTS: AssignListTest[] = [
     name: "ET - May 2026 - 001 - SQL-Python-DSA",
     subject: "SQL-Python-DSA",
     type: "Employability Test",
-    duration: 60,
     marks: 100,
     description: "Employability / bootcamp test — May 2026.",
     status: "unassigned",
@@ -327,10 +362,14 @@ export type BatchStudent = {
   branch: string;
   assigned: boolean;
   testTaken: boolean;
-  /** Marked absent — cannot be assigned to Subject Final Test */
+  /** Marked absent — cannot be assigned to final test */
   absent?: boolean;
+  /** Auto-marked absent: not present within 25% of test duration */
+  autoAbsent25?: boolean;
   /** Subjects for which this student already completed a final test */
   finalTestCompletedSubjects?: string[];
+  /** Subjects for which this student attempted a final test (incl. in progress) */
+  attemptedFinalSubjects?: string[];
 };
 
 export const STUDENTS_BY_BATCH: Record<string, BatchStudent[]> = {
@@ -368,6 +407,7 @@ export const STUDENTS_BY_BATCH: Record<string, BatchStudent[]> = {
       branch: "CSE",
       assigned: false,
       testTaken: false,
+      autoAbsent25: true,
     },
     {
       id: "STU-005",
@@ -494,13 +534,14 @@ export function getStudentsForBatch(batchName: string): BatchStudent[] {
 export function getEligibleStudentsForAssign(
   batchName: string,
   subject: string,
-  isSubjectFinalTest: boolean
+  isFinalTestFlow: boolean
 ): BatchStudent[] {
   const pool = getStudentsForBatch(batchName);
-  if (!isSubjectFinalTest) return pool;
+  if (!isFinalTestFlow) return pool;
   return pool.filter(
     (student) =>
       !student.absent &&
+      !student.autoAbsent25 &&
       !(student.finalTestCompletedSubjects ?? []).includes(subject)
   );
 }
@@ -508,14 +549,46 @@ export function getEligibleStudentsForAssign(
 export function getStudentAssignBlockReason(
   student: BatchStudent,
   subject: string,
-  isSubjectFinalTest: boolean
+  isFinalTestFlow: boolean
 ): string | null {
-  if (!isSubjectFinalTest) return null;
+  if (!isFinalTestFlow) return null;
   if (student.absent) return "Absent — cannot assign final test";
+  if (student.autoAbsent25) {
+    return "Auto-absent (not present within 25% of test duration)";
+  }
   if ((student.finalTestCompletedSubjects ?? []).includes(subject)) {
     return `Already completed final test for ${subject}`;
   }
   return null;
+}
+
+export function getAssignedStudentIds(
+  batches: TestBatchAssignment[]
+): string[] {
+  const ids = new Set<string>();
+  batches.forEach((b) => {
+    b.assignedStudentIds?.forEach((id) => ids.add(id));
+  });
+  return [...ids];
+}
+
+export function allAssignedStudentsAttemptedFinal(
+  batches: TestBatchAssignment[],
+  subject: string
+): boolean {
+  const ids = getAssignedStudentIds(batches);
+  if (ids.length === 0) return false;
+
+  return ids.every((id) => {
+    for (const batch of batches) {
+      const pool = getStudentsForBatch(batch.batch_name);
+      const student = pool.find((s) => s.id === id);
+      if (!student) continue;
+      if (student.absent || student.autoAbsent25) return true;
+      return (student.attemptedFinalSubjects ?? []).includes(subject);
+    }
+    return false;
+  });
 }
 
 export function getInitialAssignedIds(
@@ -524,6 +597,21 @@ export function getInitialAssignedIds(
   if (batch.assignedStudentIds?.length) return [...batch.assignedStudentIds];
   const pool = getStudentsForBatch(batch.batch_name);
   return pool.filter((s) => s.assigned).map((s) => s.id);
+}
+
+export function getTestDuration(test: AssignListTest): number | null {
+  if (test.type === "Subject Final Test") {
+    return test.levelRulesApplied
+      ? computeDurationFromLevelRules(DEFAULT_LEVEL_RULES)
+      : null;
+  }
+
+  if (test.selectionLogicSaved && test.selectionLogic) {
+    const minutes = computeDurationFromSelectionLogic(test.selectionLogic);
+    return minutes > 0 ? minutes : null;
+  }
+
+  return null;
 }
 
 export function getTestById(id: string): AssignListTest | undefined {

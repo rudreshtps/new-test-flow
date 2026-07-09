@@ -12,6 +12,9 @@ import ChangeDurationScreen from "./screens/ChangeDurationScreen";
 import AttendanceScreen from "./screens/AttendanceScreen";
 import TriggeredTestsScreen from "./screens/TriggeredTestsScreen";
 import CompletedTestsScreen from "./screens/CompletedTestsScreen";
+import TestReportsScreen from "./screens/TestReportsScreen";
+import TrainerPerformanceScreen from "./screens/TrainerPerformanceScreen";
+import CourseConfigScreen from "./screens/CourseConfigScreen";
 
 export default function App() {
   return (
@@ -29,6 +32,9 @@ export default function App() {
         <Route path="attendance" element={<AttendanceScreen />} />
         <Route path="triggered-tests" element={<TriggeredTestsScreen />} />
         <Route path="completed-tests" element={<CompletedTestsScreen />} />
+        <Route path="test-reports" element={<TestReportsScreen />} />
+        <Route path="trainer-performance" element={<TrainerPerformanceScreen />} />
+        <Route path="course-config" element={<CourseConfigScreen />} />
       </Route>
     </Routes>
   );

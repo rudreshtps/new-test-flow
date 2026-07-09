@@ -5,6 +5,10 @@ import {
   getRuleMcqTotal,
 } from "../data/questionBank";
 import type { Question, QuestionSelectionLogic } from "../types";
+import {
+  getLogicSubjects,
+  resolveRuleSubject,
+} from "./selectionLogicHelpers";
 
 function shuffle<T>(items: T[]): T[] {
   const copy = [...items];
@@ -16,14 +20,43 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 export function filterQuestionPool(logic: QuestionSelectionLogic): Question[] {
+  const subjects = getLogicSubjects(logic);
+
   return QUESTION_BANK.filter((question) => {
-    if (question.subject !== logic.subject) return false;
-    if (logic.topics.length > 0 && !logic.topics.includes(question.topic)) {
-      return false;
+    if (!subjects.includes(question.subject)) return false;
+    if (logic.topics.length > 0) {
+      const topicMatches = logic.subtopicRules.length > 0
+        ? logic.subtopicRules.some(
+            (rule) =>
+              resolveRuleSubject(rule, logic) === question.subject &&
+              rule.topic === question.topic
+          )
+        : logic.topics.some((topicValue) => {
+            if (logic.subjects?.length) {
+              const sep = topicValue.indexOf("::");
+              if (sep === -1) return false;
+              const subject = topicValue.slice(0, sep);
+              const topic = topicValue.slice(sep + 2);
+              return question.subject === subject && question.topic === topic;
+            }
+            return question.topic === topicValue;
+          });
+      if (!topicMatches) return false;
     }
     if (
       logic.subtopics.length > 0 &&
-      !logic.subtopics.includes(question.subtopic)
+      !logic.subtopics.some((subtopicValue) => {
+        if (logic.subjects?.length) {
+          const sep = subtopicValue.indexOf("::");
+          if (sep === -1) return false;
+          const subject = subtopicValue.slice(0, sep);
+          const subtopic = subtopicValue.slice(sep + 2);
+          return (
+            question.subject === subject && question.subtopic === subtopic
+          );
+        }
+        return question.subtopic === subtopicValue;
+      })
     ) {
       return false;
     }
@@ -55,6 +88,8 @@ export function generateQuestionsFromLogic(
   const warnings: string[] = [];
 
   logic.subtopicRules.forEach((rule) => {
+    const ruleSubject = resolveRuleSubject(rule, logic);
+
     QUESTION_LEVELS.forEach((level) => {
       const levelRule = rule.levelCounts.find((item) => item.level === level);
       if (!levelRule) return;
@@ -66,7 +101,8 @@ export function generateQuestionsFromLogic(
 
         const pool = QUESTION_BANK.filter(
           (question) =>
-            question.subject === logic.subject &&
+            question.subject === ruleSubject &&
+            question.topic === rule.topic &&
             question.subtopic === rule.subtopic &&
             question.level === level &&
             question.type === type &&
@@ -77,7 +113,7 @@ export function generateQuestionsFromLogic(
         const picks = shuffle(pool).slice(0, count);
         if (picks.length < count) {
           warnings.push(
-            `${rule.subtopic} L${level} (${type}): only ${picks.length} of ${count} questions available.`
+            `${ruleSubject} · ${rule.subtopic} L${level} (${type}): only ${picks.length} of ${count} questions available.`
           );
         }
         selected.push(...picks);

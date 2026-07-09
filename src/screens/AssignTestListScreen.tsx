@@ -13,6 +13,7 @@ import {
   MOCK_TESTS,
   formatAssignDate,
   formatAssignTime,
+  getTestDuration,
   type AssignListStatus,
   type AssignListTest,
 } from "../constants/assignTestConstants";
@@ -153,7 +154,9 @@ function AssignTestList() {
               No tests match your filters.
             </p>
           ) : (
-            filteredTests.map((test) => (
+            filteredTests.map((test) => {
+              const durationMinutes = getTestDuration(test);
+              return (
               <div
                 key={test.id}
                 role="button"
@@ -181,11 +184,13 @@ function AssignTestList() {
                         <VscListFlat className="me-1" />
                         {test.subject || "N/A"}
                       </span>
-                      <span className="d-inline-flex align-items-center">
-                        <BsClock className="me-1" style={metaIconStyle} />
-                        {test.duration}{" "}
-                        {test.duration === 1 ? "Minute" : "Minutes"}
-                      </span>
+                      {durationMinutes != null && (
+                        <span className="d-inline-flex align-items-center">
+                          <BsClock className="me-1" style={metaIconStyle} />
+                          {durationMinutes}{" "}
+                          {durationMinutes === 1 ? "Minute" : "Minutes"}
+                        </span>
+                      )}
                       <span className="d-inline-flex align-items-center">
                         <GiStarShuriken className="me-1" />
                         {test.marks} Marks
@@ -251,7 +256,8 @@ function AssignTestList() {
                   </Button>
                 </div>
               </div>
-            ))
+            );
+            })
           )}
         </div>
       </div>

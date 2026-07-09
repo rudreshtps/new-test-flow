@@ -10,18 +10,10 @@ import {
 } from "react-bootstrap";
 import MultiSelect from "./MultiSelect";
 import {
-  buildSubtopicRules,
-  getDefaultLogicForSubject,
   getRuleCodingTotal,
   getRuleMcqTotal,
-  getScopeAvailability,
-  getSubtopicAvailability,
   getSubtopicLevelAvailability,
-  getSubjectAvailability,
-  getSubtopicsByTopic,
-  getSubtopicsForTopics,
   getSubjects,
-  getTopicsForSubject,
   QUESTION_LEVELS,
 } from "../data/questionBank";
 import { DEFAULT_LEVEL_RULES } from "../data/mockData";
@@ -30,12 +22,27 @@ import {
   getTotalQuestionTarget,
   summarizeSubtopicRules,
 } from "../utils/questionSelection";
+import {
+  allowsMultiSubjectSelection,
+  buildSubtopicRulesFromSelection,
+  formatLogicSubjects,
+  getDefaultLogicForTest,
+  getLogicSubjects,
+  getScopeAvailabilityForLogic,
+  getSubtopicOptionsForLogic,
+  getSubjectsCombinedAvailability,
+  getTopicOptionsForLogic,
+  getValidSubtopicsForTopics,
+  normalizeLogicSubjects,
+  resolveRuleSubject,
+} from "../utils/selectionLogicHelpers";
 
 type QuestionConfigModalProps = {
   show: boolean;
   scheduleLabel: string;
   batchNames: string[];
   testSubject: string;
+  testType: string;
   initialConfig?: { logic: QuestionSelectionLogic; logicSaved?: boolean };
   onHide: () => void;
   onSaveLogic: (logic: QuestionSelectionLogic) => void;
@@ -50,17 +57,17 @@ export default function QuestionConfigModal({
   scheduleLabel,
   batchNames,
   testSubject,
+  testType,
   initialConfig,
   onHide,
   onSaveLogic,
 }: QuestionConfigModalProps) {
+  const allowMultiSubject = allowsMultiSubjectSelection(testType);
   const subjectOptions = getSubjects();
-  const defaultSubject = subjectOptions.includes(testSubject)
-    ? testSubject
-    : subjectOptions[0] ?? testSubject;
 
   const [logic, setLogic] = useState<QuestionSelectionLogic>(() =>
-    initialConfig?.logic ?? getDefaultLogicForSubject(defaultSubject)
+    initialConfig?.logic ??
+      getDefaultLogicForTest(testSubject, allowMultiSubject)
   );
   const [savedLogic, setSavedLogic] = useState<QuestionSelectionLogic | null>(
     () => (initialConfig?.logicSaved ? initialConfig.logic : null)
@@ -72,55 +79,59 @@ export default function QuestionConfigModal({
   useEffect(() => {
     if (!show) return;
     const baseLogic =
-      initialConfig?.logic ?? getDefaultLogicForSubject(defaultSubject);
+      initialConfig?.logic ??
+      getDefaultLogicForTest(testSubject, allowMultiSubject);
     const nextLogic: QuestionSelectionLogic = {
       ...baseLogic,
       subtopicRules:
         baseLogic.subtopicRules?.length > 0
           ? baseLogic.subtopicRules
-          : buildSubtopicRules(
-              baseLogic.subject,
+          : buildSubtopicRulesFromSelection(
+              baseLogic,
+              allowMultiSubject,
               baseLogic.topics,
               baseLogic.subtopics,
               []
             ),
     };
-    setLogic(nextLogic);
-    setSavedLogic(initialConfig?.logicSaved ? nextLogic : null);
+    setLogic(normalizeLogicSubjects(nextLogic, allowMultiSubject));
+    setSavedLogic(
+      initialConfig?.logicSaved
+        ? normalizeLogicSubjects(nextLogic, allowMultiSubject)
+        : null
+    );
     setLogicSaved(initialConfig?.logicSaved ?? false);
-  }, [show, initialConfig, defaultSubject]);
+  }, [show, initialConfig, testSubject, allowMultiSubject]);
 
-  const topicOptions = getTopicsForSubject(logic.subject);
-  const subtopicGroups = getSubtopicsByTopic(logic.subject, logic.topics);
+  const selectedSubjects = getLogicSubjects(logic);
+  const topicOptions = useMemo(
+    () => getTopicOptionsForLogic(logic, allowMultiSubject),
+    [logic, allowMultiSubject]
+  );
+  const subtopicSelectOptions = useMemo(
+    () => getSubtopicOptionsForLogic(logic, allowMultiSubject),
+    [logic, allowMultiSubject]
+  );
   const logicDirty =
     logicSaved && savedLogic ? !logicEquals(logic, savedLogic) : false;
 
-  const subtopicSelectOptions = useMemo(
-    () =>
-      subtopicGroups.flatMap((group) =>
-        group.subtopics.map((subtopic) => {
-          const available = getSubtopicAvailability(logic.subject, subtopic);
-          return {
-            value: subtopic,
-            label: `${group.topic} — ${subtopic} (${available.mcq} MCQ, ${available.coding} Coding in DB)`,
-          };
-        })
-      ),
-    [subtopicGroups, logic.subject]
-  );
-
   const scopeAvailability = useMemo(
-    () => getScopeAvailability(logic.subject, logic.subtopicRules),
-    [logic.subject, logic.subtopicRules]
+    () => getScopeAvailabilityForLogic(logic),
+    [logic]
   );
 
   const subjectAvailability = useMemo(
-    () => getSubjectAvailability(logic.subject),
-    [logic.subject]
+    () =>
+      allowMultiSubject
+        ? getSubjectsCombinedAvailability(selectedSubjects)
+        : getSubjectsCombinedAvailability(
+            selectedSubjects.length ? selectedSubjects : [logic.subject]
+          ),
+    [allowMultiSubject, selectedSubjects, logic.subject]
   );
 
   const markLogicDirty = (next: QuestionSelectionLogic) => {
-    setLogic(next);
+    setLogic(normalizeLogicSubjects(next, allowMultiSubject));
     if (logicSaved && savedLogic && !logicEquals(next, savedLogic)) {
       setLogicSaved(false);
     }
@@ -128,6 +139,7 @@ export default function QuestionConfigModal({
 
   const updateSubtopicLevelCount = (
     subtopic: string,
+    subject: string | undefined,
     level: number,
     field: "mcqCount" | "codingCount",
     value: number
@@ -135,7 +147,8 @@ export default function QuestionConfigModal({
     markLogicDirty({
       ...logic,
       subtopicRules: logic.subtopicRules.map((rule) =>
-        rule.subtopic === subtopic
+        rule.subtopic === subtopic &&
+        (rule.subject ?? logic.subject) === (subject ?? logic.subject)
           ? {
               ...rule,
               levelCounts: rule.levelCounts.map((levelRule) =>
@@ -149,8 +162,30 @@ export default function QuestionConfigModal({
     });
   };
 
+  const handleSubjectsChange = (subjects: string[]) => {
+    markLogicDirty({
+      subject: subjects.join(" · "),
+      subjects,
+      topics: [],
+      subtopics: [],
+      subtopicRules: [],
+    });
+    setSavedLogic(null);
+    setLogicSaved(false);
+  };
+
+  const handleSingleSubjectChange = (subject: string) => {
+    markLogicDirty(getDefaultLogicForTest(subject, false));
+    setSavedLogic(null);
+    setLogicSaved(false);
+  };
+
   const handleTopicsChange = (topics: string[]) => {
-    const validSubtopics = getSubtopicsForTopics(logic.subject, topics);
+    const validSubtopics = getValidSubtopicsForTopics(
+      logic,
+      allowMultiSubject,
+      topics
+    );
     const subtopics = logic.subtopics.filter((subtopic) =>
       validSubtopics.includes(subtopic)
     );
@@ -158,8 +193,9 @@ export default function QuestionConfigModal({
       ...logic,
       topics,
       subtopics,
-      subtopicRules: buildSubtopicRules(
-        logic.subject,
+      subtopicRules: buildSubtopicRulesFromSelection(
+        logic,
+        allowMultiSubject,
         topics,
         subtopics,
         logic.subtopicRules
@@ -171,8 +207,9 @@ export default function QuestionConfigModal({
     markLogicDirty({
       ...logic,
       subtopics,
-      subtopicRules: buildSubtopicRules(
-        logic.subject,
+      subtopicRules: buildSubtopicRulesFromSelection(
+        logic,
+        allowMultiSubject,
         logic.topics,
         subtopics,
         logic.subtopicRules
@@ -181,7 +218,7 @@ export default function QuestionConfigModal({
   };
 
   const selectAllTopics = () => {
-    handleTopicsChange([...topicOptions]);
+    handleTopicsChange(topicOptions.map((option) => option.value));
   };
 
   const clearAllTopics = () => {
@@ -189,7 +226,7 @@ export default function QuestionConfigModal({
   };
 
   const selectAllSubtopics = () => {
-    handleSubtopicsChange(subtopicSelectOptions.map((o) => o.value));
+    handleSubtopicsChange(subtopicSelectOptions.map((option) => option.value));
   };
 
   const clearAllSubtopics = () => {
@@ -197,11 +234,23 @@ export default function QuestionConfigModal({
   };
 
   const handleSaveLogic = () => {
-    if (logic.topics.length === 0 || getTotalQuestionTarget(logic) === 0) return;
-    setSavedLogic(logic);
+    const normalized = normalizeLogicSubjects(logic, allowMultiSubject);
+    if (
+      getLogicSubjects(normalized).length === 0 ||
+      normalized.topics.length === 0 ||
+      getTotalQuestionTarget(normalized) === 0
+    ) {
+      return;
+    }
+    setSavedLogic(normalized);
     setLogicSaved(true);
-    onSaveLogic(logic);
+    onSaveLogic(normalized);
   };
+
+  const canSave =
+    getLogicSubjects(logic).length > 0 &&
+    logic.topics.length > 0 &&
+    getTotalQuestionTarget(logic) > 0;
 
   return (
     <Modal show={show} onHide={onHide} size="xl" centered scrollable>
@@ -233,22 +282,28 @@ export default function QuestionConfigModal({
                 <Col md={4}>
                   <Form.Group>
                     <Form.Label className="fw-semibold small">Subject</Form.Label>
-                    <Form.Select
-                      value={logic.subject}
-                      onChange={(e) => {
-                        const subject = e.target.value;
-                        const defaults = getDefaultLogicForSubject(subject);
-                        markLogicDirty(defaults);
-                        setSavedLogic(null);
-                        setLogicSaved(false);
-                      }}
-                    >
-                      {subjectOptions.map((subject) => (
-                        <option key={subject} value={subject}>
-                          {subject}
-                        </option>
-                      ))}
-                    </Form.Select>
+                    {allowMultiSubject ? (
+                      <MultiSelect
+                        options={subjectOptions.map((subject) => ({
+                          value: subject,
+                          label: subject,
+                        }))}
+                        value={selectedSubjects}
+                        onChange={handleSubjectsChange}
+                        placeholder="Select subject(s)"
+                      />
+                    ) : (
+                      <Form.Select
+                        value={logic.subject}
+                        onChange={(e) => handleSingleSubjectChange(e.target.value)}
+                      >
+                        {subjectOptions.map((subject) => (
+                          <option key={subject} value={subject}>
+                            {subject}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    )}
                   </Form.Group>
                 </Col>
                 <Col md={4}>
@@ -260,6 +315,7 @@ export default function QuestionConfigModal({
                         size="sm"
                         className="p-0 text-decoration-none"
                         onClick={selectAllTopics}
+                        disabled={topicOptions.length === 0}
                       >
                         All
                       </Button>
@@ -268,23 +324,27 @@ export default function QuestionConfigModal({
                         size="sm"
                         className="p-0 text-decoration-none text-muted"
                         onClick={clearAllTopics}
+                        disabled={topicOptions.length === 0}
                       >
                         Clear
                       </Button>
                     </div>
                   </div>
                   <MultiSelect
-                    options={topicOptions.map((topic) => ({
-                      value: topic,
-                      label: topic,
-                    }))}
+                    options={topicOptions}
                     value={logic.topics}
                     onChange={handleTopicsChange}
-                    placeholder="Select topic(s)"
+                    placeholder={
+                      allowMultiSubject && selectedSubjects.length === 0
+                        ? "Select subject(s) first"
+                        : "Select topic(s)"
+                    }
+                    disabled={
+                      allowMultiSubject
+                        ? selectedSubjects.length === 0
+                        : !logic.subject
+                    }
                   />
-                  <Form.Text className="text-muted">
-                    {logic.topics.length} topic(s) selected
-                  </Form.Text>
                 </Col>
                 <Col md={4}>
                   <div className="d-flex justify-content-between align-items-center mb-1">
@@ -323,12 +383,6 @@ export default function QuestionConfigModal({
                     }
                     disabled={logic.topics.length === 0}
                   />
-                  <Form.Text className="text-muted">
-                    {logic.subtopics.length} subtopic(s) selected
-                    {logic.subtopics.length === 0 &&
-                      logic.topics.length > 0 &&
-                      " — leave empty to include all subtopics under selected topics"}
-                  </Form.Text>
                 </Col>
               </Row>
 
@@ -339,8 +393,8 @@ export default function QuestionConfigModal({
                   </span>
                   <div className="d-flex flex-wrap gap-2">
                     <Badge bg="light" text="dark" className="border">
-                      {logic.subject} in DB: {subjectAvailability.mcq} MCQ ·{" "}
-                      {subjectAvailability.coding} Coding (
+                      {formatLogicSubjects(logic)} in DB: {subjectAvailability.mcq}{" "}
+                      MCQ · {subjectAvailability.coding} Coding (
                       {subjectAvailability.total} total)
                     </Badge>
                     {logic.subtopicRules.length > 0 && (
@@ -354,12 +408,15 @@ export default function QuestionConfigModal({
                 </div>
                 {logic.subtopicRules.length === 0 ? (
                   <div className="text-muted small border rounded p-3">
-                    Select topics to configure question counts per subtopic.
+                    {allowMultiSubject && selectedSubjects.length === 0
+                      ? "Select one or more subjects, then choose topics to configure question counts per subtopic."
+                      : "Select topics to configure question counts per subtopic."}
                   </div>
                 ) : (
                   <Table size="sm" bordered responsive className="mb-0 align-middle">
                     <thead className="table-light">
                       <tr>
+                        {allowMultiSubject && <th rowSpan={2}>Subject</th>}
                         <th rowSpan={2}>Topic</th>
                         <th rowSpan={2}>Subtopic</th>
                         <th rowSpan={2}>Level</th>
@@ -372,22 +429,23 @@ export default function QuestionConfigModal({
                       </tr>
                       <tr>
                         <th className="text-center" style={{ width: 72 }}>
-                          Set
+                          Selected
                         </th>
                         <th className="text-center" style={{ width: 56 }}>
-                          In DB
+                          Available
                         </th>
                         <th className="text-center" style={{ width: 72 }}>
-                          Set
+                          Selected
                         </th>
                         <th className="text-center" style={{ width: 56 }}>
-                          In DB
+                          Available
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {logic.subtopicRules.map((rule) =>
-                        QUESTION_LEVELS.map((level, levelIndex) => {
+                      {logic.subtopicRules.map((rule) => {
+                        const ruleSubject = resolveRuleSubject(rule, logic);
+                        return QUESTION_LEVELS.map((level, levelIndex) => {
                           const levelMeta = DEFAULT_LEVEL_RULES.find(
                             (item) => item.level === level
                           );
@@ -398,14 +456,22 @@ export default function QuestionConfigModal({
                               codingCount: 0,
                             };
                           const available = getSubtopicLevelAvailability(
-                            logic.subject,
+                            ruleSubject,
                             rule.subtopic,
                             level
                           );
                           return (
-                            <tr key={`${rule.subtopic}-L${level}`}>
+                            <tr key={`${ruleSubject}-${rule.subtopic}-L${level}`}>
                               {levelIndex === 0 && (
                                 <>
+                                  {allowMultiSubject && (
+                                    <td
+                                      rowSpan={QUESTION_LEVELS.length}
+                                      className="small fw-semibold"
+                                    >
+                                      {ruleSubject}
+                                    </td>
+                                  )}
                                   <td
                                     rowSpan={QUESTION_LEVELS.length}
                                     className="small"
@@ -438,6 +504,7 @@ export default function QuestionConfigModal({
                                   onChange={(e) =>
                                     updateSubtopicLevelCount(
                                       rule.subtopic,
+                                      rule.subject,
                                       level,
                                       "mcqCount",
                                       Number(e.target.value)
@@ -463,6 +530,7 @@ export default function QuestionConfigModal({
                                   onChange={(e) =>
                                     updateSubtopicLevelCount(
                                       rule.subtopic,
+                                      rule.subject,
                                       level,
                                       "codingCount",
                                       Number(e.target.value)
@@ -482,12 +550,15 @@ export default function QuestionConfigModal({
                               </td>
                             </tr>
                           );
-                        })
-                      )}
+                        });
+                      })}
                     </tbody>
                     <tfoot className="table-light">
                       <tr>
-                        <td colSpan={3} className="fw-semibold small">
+                        <td
+                          colSpan={allowMultiSubject ? 4 : 3}
+                          className="fw-semibold small"
+                        >
                           Total to assign
                         </td>
                         <td className="text-center">
@@ -529,10 +600,7 @@ export default function QuestionConfigModal({
                 <Button
                   variant="primary"
                   size="sm"
-                  disabled={
-                    logic.topics.length === 0 ||
-                    getTotalQuestionTarget(logic) === 0
-                  }
+                  disabled={!canSave}
                   onClick={handleSaveLogic}
                 >
                   Save Logic
@@ -547,9 +615,7 @@ export default function QuestionConfigModal({
         </Button>
         <Button
           variant="primary"
-          disabled={
-            logic.topics.length === 0 || getTotalQuestionTarget(logic) === 0
-          }
+          disabled={!canSave}
           onClick={() => {
             handleSaveLogic();
             onHide();
