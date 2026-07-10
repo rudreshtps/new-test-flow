@@ -1,5 +1,7 @@
+import { Link } from "react-router-dom";
 import { Table } from "react-bootstrap";
 import TestPageShell from "../components/TestPageShell";
+import { MOCK_PERFORMANCE_REPORT_ID } from "../data/reportMockData";
 import { MOCK_COMPLETED_TESTS } from "../data/sftMockData";
 import { formatAssignDate, formatAssignTime } from "../constants/assignTestConstants";
 
@@ -27,6 +29,7 @@ export default function CompletedTestsScreen() {
                   <th>MCQ / Coding</th>
                   <th>Difficulty</th>
                   <th>Topics</th>
+                  <th>Report</th>
                 </tr>
               </thead>
               <tbody>
@@ -51,6 +54,18 @@ export default function CompletedTestsScreen() {
                     </td>
                     <td>{row.difficulty}</td>
                     <td>{row.topicsCovered}</td>
+                    <td>
+                      {row.id === "cmp-test-12-5" ? (
+                        <Link
+                          to={`/test-reports/${encodeURIComponent("Test 12-5")}?test_id=${encodeURIComponent(MOCK_PERFORMANCE_REPORT_ID)}`}
+                          className="btn btn-link btn-sm p-0"
+                        >
+                          View
+                        </Link>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

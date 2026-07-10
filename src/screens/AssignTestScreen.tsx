@@ -957,7 +957,6 @@ const AssignTestDetail = () => {
       variant: "info",
       message: `Test triggered at ${time}. Students can now begin.`,
     });
-    navigate("/live-monitor");
   };
 
   const canAssignGroup = (groupKey: string) => {
@@ -1272,16 +1271,13 @@ const AssignTestDetail = () => {
 
       {isSubjectFinalTest && (
         <div className="card shadow-sm border-0 mb-2">
-          <div className="card-header bg-white py-2 d-flex justify-content-between">
+          <div className="card-header bg-white py-2">
             <span className="small fw-semibold">
               Level-wise Rules{" "}
               <Badge bg="warning" text="dark">
                 Subject Final Test
               </Badge>
             </span>
-            <Link to="/level-rules" className="btn btn-link btn-sm p-0">
-              Edit rules
-            </Link>
           </div>
           <div className="card-body p-2 small">
             <div className="text-muted mb-2">

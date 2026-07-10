@@ -1,46 +1,3 @@
-export type GradeBand = {
-  band: "SUN" | "MOON" | "STAR" | "REST";
-  percent: number;
-  count: number;
-};
-
-export type TestReportRow = {
-  id: string;
-  testName: string;
-  courseName: string;
-  batchName: string;
-  subjectName: string;
-  status: "Generated" | "Emailed";
-  totalStudents: number;
-  studentsAttended: number;
-  studentsAbsent: number;
-  passPercent: number;
-  failPercent: number;
-  grades: GradeBand[];
-};
-
-export const MOCK_TEST_REPORTS: TestReportRow[] = [
-  {
-    id: "rpt-1",
-    testName: "SQL  - FYP 2026 - FT001",
-    courseName: "FYP 2026",
-    batchName: "Batch-04",
-    subjectName: "SQL",
-    status: "Generated",
-    totalStudents: 30,
-    studentsAttended: 28,
-    studentsAbsent: 2,
-    passPercent: 85,
-    failPercent: 15,
-    grades: [
-      { band: "SUN", percent: 25, count: 7 },
-      { band: "MOON", percent: 35, count: 10 },
-      { band: "STAR", percent: 25, count: 7 },
-      { band: "REST", percent: 15, count: 4 },
-    ],
-  },
-];
-
 export type TriggeredTestRow = {
   id: string;
   testName: string;
@@ -101,6 +58,24 @@ export const MOCK_TRIGGERED_TESTS: TriggeredTestRow[] = [
 ];
 
 export const MOCK_COMPLETED_TESTS: CompletedTestRow[] = [
+  {
+    id: "cmp-test-12-5",
+    testName: "Test 12-5",
+    assignedDate: "2026-07-09",
+    assignedTime: "16:00",
+    durationMinutes: 20,
+    course: "Example course",
+    batch: "BC7",
+    studentsAttempted: "2/7",
+    absentCount: 5,
+    unassignedCount: 0,
+    trainerName: "Ravi Kumar",
+    proctoringViolations: 8,
+    mcqCount: 8,
+    codingCount: 4,
+    difficulty: "Mixed (L1–L3)",
+    topicsCovered: "Query Fundamentals, Joins",
+  },
   {
     id: "cmp-1",
     testName: "SQL  - FYP 2026 - FT001",

@@ -3,20 +3,14 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { MdOutlineQuiz } from "react-icons/md";
 
 const SIDEBAR_ITEMS = [
-  { label: "Dashboard", path: "/" },
   {
     label: "Tests",
     subMenu: [
       { label: "Create", path: "/create-test" },
-      { label: "Course Config", path: "/course-config" },
       { label: "Assign", path: "/assign-test" },
       { label: "Triggered", path: "/triggered-tests" },
       { label: "Completed", path: "/completed-tests" },
       { label: "Reports", path: "/test-reports" },
-      { label: "Trainer Performance", path: "/trainer-performance" },
-      { label: "Level Rules", path: "/level-rules" },
-      { label: "Question Sets", path: "/time-question-sets" },
-      { label: "Live Monitor", path: "/live-monitor" },
     ],
   },
 ];
@@ -27,9 +21,15 @@ export default function MockLayout() {
   const location = useLocation();
 
   const pathSegments = location.pathname.split("/").filter(Boolean);
-  const formattedTitle = pathSegments.length
-    ? pathSegments.map((s) => s.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())).join(" > ")
-    : "Overview";
+  const formattedTitle = location.pathname.startsWith("/test-reports")
+    ? "Test > Performance Analysis"
+    : pathSegments.length
+      ? pathSegments
+          .map((s) =>
+            s.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+          )
+          .join(" > ")
+      : "Create Test";
 
   return (
     <div style={{ backgroundColor: "#f0f0f0", minHeight: "100vh" }}>
@@ -57,42 +57,30 @@ export default function MockLayout() {
         <div className="mt-3" style={{ fontSize: "14px" }}>
           {SIDEBAR_ITEMS.map((item) => (
             <div key={item.label}>
-              {item.subMenu ? (
-                <>
-                  <div
-                    className="d-flex align-items-center p-2 px-3 mb-1 hover-bg-primary"
-                    style={{ cursor: "pointer" }}
-                    onClick={() => setOpenSubMenu(openSubMenu === item.label ? "" : item.label)}
-                  >
-                    <MdOutlineQuiz size={22} className="me-2 flex-shrink-0" />
-                    {showSidebar && <span>{item.label}</span>}
-                  </div>
-                  {showSidebar && openSubMenu === item.label && (
-                    <div className="ps-4">
-                      {item.subMenu.map((sub) => (
-                        <NavLink
-                          key={sub.path}
-                          to={sub.path}
-                          className={({ isActive }) =>
-                            `d-block py-1 px-2 mb-1 text-decoration-none${isActive ? " text-primary fw-semibold" : " text-dark"}`
-                          }
-                        >
-                          {sub.label}
-                        </NavLink>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <NavLink
-                  to={item.path}
-                  end
-                  className={({ isActive }) =>
-                    `d-flex align-items-center p-2 px-3 mb-1 text-decoration-none hover-bg-primary${isActive ? " text-primary fw-semibold" : " text-dark"}`
-                  }
-                >
-                  {showSidebar && <span>{item.label}</span>}
-                </NavLink>
+              <div
+                className="d-flex align-items-center p-2 px-3 mb-1 hover-bg-primary"
+                style={{ cursor: "pointer" }}
+                onClick={() =>
+                  setOpenSubMenu(openSubMenu === item.label ? "" : item.label)
+                }
+              >
+                <MdOutlineQuiz size={22} className="me-2 flex-shrink-0" />
+                {showSidebar && <span>{item.label}</span>}
+              </div>
+              {showSidebar && openSubMenu === item.label && (
+                <div className="ps-4">
+                  {item.subMenu.map((sub) => (
+                    <NavLink
+                      key={sub.path}
+                      to={sub.path}
+                      className={({ isActive }) =>
+                        `d-block py-1 px-2 mb-1 text-decoration-none${isActive ? " text-primary fw-semibold" : " text-dark"}`
+                      }
+                    >
+                      {sub.label}
+                    </NavLink>
+                  ))}
+                </div>
               )}
             </div>
           ))}
