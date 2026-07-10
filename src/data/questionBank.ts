@@ -50,9 +50,83 @@ export const SUBJECT_TOPIC_TREE: Record<string, Record<string, string[]>> = {
     Transactions: ["ACID", "Isolation", "Deadlocks"],
     Indexing: ["B-Tree", "Hash index", "Query plans"],
   },
+  Python: {
+    Basics: ["Variables", "Loops", "Functions"],
+    "Data Structures": ["Lists", "Dictionaries", "Sets"],
+    OOP: ["Classes", "Inheritance", "Polymorphism"],
+  },
+  DSA: {
+    Arrays: ["Two pointers", "Prefix sum", "Sliding window"],
+    Trees: ["BST", "Traversal", "Heap"],
+    Graphs: ["BFS", "DFS", "Shortest path"],
+  },
 };
 
-export const QUESTION_BANK: Question[] = [
+const POOL_QUESTIONS_PER_LEVEL_TYPE = 12;
+
+function buildLevelPoolQuestions(
+  subject: string,
+  topic: string,
+  subtopic: string,
+  level: number,
+  mcqCount: number,
+  codingCount: number
+): Question[] {
+  const questions: Question[] = [];
+  const slug = subtopic.replace(/[^a-zA-Z0-9]+/g, "").slice(0, 14);
+  const marks = level === 1 ? 2 : level === 2 ? 3 : 5;
+
+  for (let i = 1; i <= mcqCount; i += 1) {
+    questions.push({
+      id: `${subject}-POOL-L${level}-MCQ-${slug}-${i}`,
+      subject,
+      topic,
+      subtopic,
+      text: `${subtopic}: MCQ practice question ${i} (Level ${level}).`,
+      level,
+      marks,
+      type: "MCQ",
+    });
+  }
+
+  for (let i = 1; i <= codingCount; i += 1) {
+    questions.push({
+      id: `${subject}-POOL-L${level}-COD-${slug}-${i}`,
+      subject,
+      topic,
+      subtopic,
+      text: `${subtopic}: Coding practice question ${i} (Level ${level}).`,
+      level,
+      marks: marks + 2,
+      type: "Coding",
+    });
+  }
+
+  return questions;
+}
+
+function buildSubjectQuestionPool(
+  subject: string,
+  tree: Record<string, string[]>,
+  perLevelType = POOL_QUESTIONS_PER_LEVEL_TYPE
+): Question[] {
+  return Object.entries(tree).flatMap(([topic, subtopics]) =>
+    subtopics.flatMap((subtopic) =>
+      QUESTION_LEVELS.flatMap((level) =>
+        buildLevelPoolQuestions(
+          subject,
+          topic,
+          subtopic,
+          level,
+          perLevelType,
+          perLevelType
+        )
+      )
+    )
+  );
+}
+
+const BASE_QUESTION_BANK: Question[] = [
   {
     id: "SQL-L1-01",
     subject: "SQL",
@@ -293,6 +367,15 @@ export const QUESTION_BANK: Question[] = [
     marks: 5,
     type: "Coding",
   },
+];
+
+export const QUESTION_BANK: Question[] = [
+  ...BASE_QUESTION_BANK,
+  ...buildSubjectQuestionPool("SQL", SUBJECT_TOPIC_TREE.SQL),
+  ...buildSubjectQuestionPool("Python", SUBJECT_TOPIC_TREE.Python),
+  ...buildSubjectQuestionPool("DSA", SUBJECT_TOPIC_TREE.DSA),
+  ...buildSubjectQuestionPool("Data Structures", SUBJECT_TOPIC_TREE["Data Structures"]),
+  ...buildSubjectQuestionPool("DBMS", SUBJECT_TOPIC_TREE.DBMS),
 ];
 
 export function getSubjects(): string[] {

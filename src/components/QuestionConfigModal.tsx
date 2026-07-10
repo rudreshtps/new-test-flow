@@ -52,6 +52,40 @@ function logicEquals(a: QuestionSelectionLogic, b: QuestionSelectionLogic): bool
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function clampLogicToAvailability(
+  logic: QuestionSelectionLogic,
+  allowMultiSubject: boolean
+): QuestionSelectionLogic {
+  const normalized = normalizeLogicSubjects(logic, allowMultiSubject);
+  return {
+    ...normalized,
+    subtopicRules: normalized.subtopicRules.map((rule) => {
+      const ruleSubject = resolveRuleSubject(rule, normalized);
+      return {
+        ...rule,
+        levelCounts: rule.levelCounts.map((levelRule) => {
+          const available = getSubtopicLevelAvailability(
+            ruleSubject,
+            rule.subtopic,
+            levelRule.level
+          );
+          return {
+            ...levelRule,
+            mcqCount: Math.min(
+              Math.max(0, levelRule.mcqCount),
+              available.mcq
+            ),
+            codingCount: Math.min(
+              Math.max(0, levelRule.codingCount),
+              available.coding
+            ),
+          };
+        }),
+      };
+    }),
+  };
+}
+
 export default function QuestionConfigModal({
   show,
   scheduleLabel,
@@ -94,7 +128,12 @@ export default function QuestionConfigModal({
               []
             ),
     };
-    setLogic(normalizeLogicSubjects(nextLogic, allowMultiSubject));
+    setLogic(
+      clampLogicToAvailability(
+        normalizeLogicSubjects(nextLogic, allowMultiSubject),
+        allowMultiSubject
+      )
+    );
     setSavedLogic(
       initialConfig?.logicSaved
         ? normalizeLogicSubjects(nextLogic, allowMultiSubject)
@@ -131,8 +170,12 @@ export default function QuestionConfigModal({
   );
 
   const markLogicDirty = (next: QuestionSelectionLogic) => {
-    setLogic(normalizeLogicSubjects(next, allowMultiSubject));
-    if (logicSaved && savedLogic && !logicEquals(next, savedLogic)) {
+    const normalized = clampLogicToAvailability(
+      normalizeLogicSubjects(next, allowMultiSubject),
+      allowMultiSubject
+    );
+    setLogic(normalized);
+    if (logicSaved && savedLogic && !logicEquals(normalized, savedLogic)) {
       setLogicSaved(false);
     }
   };
@@ -144,6 +187,16 @@ export default function QuestionConfigModal({
     field: "mcqCount" | "codingCount",
     value: number
   ) => {
+    const ruleSubject = subject ?? logic.subject;
+    const available = getSubtopicLevelAvailability(
+      ruleSubject,
+      subtopic,
+      level
+    );
+    const max = field === "mcqCount" ? available.mcq : available.coding;
+    const parsed = Number.isFinite(value) ? value : 0;
+    const clamped = Math.max(0, Math.min(parsed, max));
+
     markLogicDirty({
       ...logic,
       subtopicRules: logic.subtopicRules.map((rule) =>
@@ -153,7 +206,7 @@ export default function QuestionConfigModal({
               ...rule,
               levelCounts: rule.levelCounts.map((levelRule) =>
                 levelRule.level === level
-                  ? { ...levelRule, [field]: value }
+                  ? { ...levelRule, [field]: clamped }
                   : levelRule
               ),
             }
@@ -234,7 +287,10 @@ export default function QuestionConfigModal({
   };
 
   const handleSaveLogic = () => {
-    const normalized = normalizeLogicSubjects(logic, allowMultiSubject);
+    const normalized = clampLogicToAvailability(
+      normalizeLogicSubjects(logic, allowMultiSubject),
+      allowMultiSubject
+    );
     if (
       getLogicSubjects(normalized).length === 0 ||
       normalized.topics.length === 0 ||
@@ -253,35 +309,52 @@ export default function QuestionConfigModal({
     getTotalQuestionTarget(logic) > 0;
 
   return (
-    <Modal show={show} onHide={onHide} size="xl" centered scrollable>
+    <Modal
+      show={show}
+      onHide={onHide}
+      size="xl"
+      centered
+      scrollable
+      className="test-flow-modal"
+    >
       <Modal.Header closeButton>
-        <Modal.Title>Selection Logic — {scheduleLabel}</Modal.Title>
+        <Modal.Title className="fs-6">
+          Selection Logic — {scheduleLabel}
+        </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
-          <div className="bg-light rounded p-3 mb-3">
-            <div className="fw-semibold small mb-1">
-              Applies to all schedules · {batchNames.length} batch(es)
-            </div>
-            <div className="text-muted small">{batchNames.join(" · ")}</div>
+      <Modal.Body className="pt-3">
+        <div className="bg-light rounded-3 border p-3 mb-3">
+          <div className="fw-semibold small mb-1">
+            Applies to all schedules · {batchNames.length} batch(es)
           </div>
+          <div className="text-muted small">{batchNames.join(" · ")}</div>
+        </div>
 
-          <div className="card shadow-sm border-0">
-            <div className="card-header bg-white d-flex justify-content-between align-items-center">
-              <span className="fw-semibold small">Selection Logic</span>
-              {logicSaved && !logicDirty && (
-                <Badge bg="success">Logic saved</Badge>
-              )}
-              {logicDirty && (
-                <Badge bg="warning" text="dark">
-                  Logic changed — save again
-                </Badge>
-              )}
-            </div>
-            <div className="card-body">
-              <Row className="g-3">
+        <div className="card shadow-sm border-0">
+          <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3">
+            <span className="fw-semibold">Selection Logic</span>
+            {logicSaved && !logicDirty && (
+              <Badge bg="success" className="fw-normal">
+                Logic saved
+              </Badge>
+            )}
+            {logicDirty && (
+              <Badge bg="warning" text="dark" className="fw-normal">
+                Logic changed — save again
+              </Badge>
+            )}
+          </div>
+          <div className="card-body p-3">
+            <Row className="g-3 mb-1">
                 <Col md={4}>
-                  <Form.Group>
-                    <Form.Label className="fw-semibold small">Subject</Form.Label>
+                  <Form.Group className="mb-0">
+                    <div
+                      className="d-flex justify-content-between align-items-center mb-1 selection-logic-filter-label"
+                    >
+                      <Form.Label className="fw-semibold small mb-0">
+                        Subject
+                      </Form.Label>
+                    </div>
                     {allowMultiSubject ? (
                       <MultiSelect
                         options={subjectOptions.map((subject) => ({
@@ -307,50 +380,53 @@ export default function QuestionConfigModal({
                   </Form.Group>
                 </Col>
                 <Col md={4}>
-                  <div className="d-flex justify-content-between align-items-center mb-1">
-                    <Form.Label className="fw-semibold small mb-0">Topics</Form.Label>
-                    <div className="d-flex gap-2">
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="p-0 text-decoration-none"
-                        onClick={selectAllTopics}
-                        disabled={topicOptions.length === 0}
-                      >
-                        All
-                      </Button>
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="p-0 text-decoration-none text-muted"
-                        onClick={clearAllTopics}
-                        disabled={topicOptions.length === 0}
-                      >
-                        Clear
-                      </Button>
+                  <Form.Group className="mb-0">
+                    <div className="d-flex justify-content-between align-items-center mb-1 selection-logic-filter-label">
+                      <Form.Label className="fw-semibold small mb-0">Topics</Form.Label>
+                      <div className="d-flex gap-2">
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 text-decoration-none"
+                          onClick={selectAllTopics}
+                          disabled={topicOptions.length === 0}
+                        >
+                          All
+                        </Button>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 text-decoration-none text-muted"
+                          onClick={clearAllTopics}
+                          disabled={topicOptions.length === 0}
+                        >
+                          Clear
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <MultiSelect
-                    options={topicOptions}
-                    value={logic.topics}
-                    onChange={handleTopicsChange}
-                    placeholder={
-                      allowMultiSubject && selectedSubjects.length === 0
-                        ? "Select subject(s) first"
-                        : "Select topic(s)"
-                    }
-                    disabled={
-                      allowMultiSubject
-                        ? selectedSubjects.length === 0
-                        : !logic.subject
-                    }
-                  />
+                    <MultiSelect
+                      options={topicOptions}
+                      value={logic.topics}
+                      onChange={handleTopicsChange}
+                      placeholder={
+                        allowMultiSubject && selectedSubjects.length === 0
+                          ? "Select subject(s) first"
+                          : "Select topic(s)"
+                      }
+                      disabled={
+                        allowMultiSubject
+                          ? selectedSubjects.length === 0
+                          : !logic.subject
+                      }
+                    />
+                  </Form.Group>
                 </Col>
                 <Col md={4}>
-                  <div className="d-flex justify-content-between align-items-center mb-1">
-                    <Form.Label className="fw-semibold small mb-0">
-                      Subtopics
-                    </Form.Label>
+                  <Form.Group className="mb-0">
+                    <div className="d-flex justify-content-between align-items-center mb-1 selection-logic-filter-label">
+                      <Form.Label className="fw-semibold small mb-0">
+                        Subtopics
+                      </Form.Label>
                     <div className="d-flex gap-2">
                       <Button
                         variant="link"
@@ -383,22 +459,23 @@ export default function QuestionConfigModal({
                     }
                     disabled={logic.topics.length === 0}
                   />
+                  </Form.Group>
                 </Col>
               </Row>
 
-              <div className="mt-3">
-                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                  <span className="fw-semibold small">
+              <div className="mt-4">
+                <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                  <span className="fw-semibold small text-secondary">
                     Level-wise MCQ &amp; Coding count per subtopic
                   </span>
-                  <div className="d-flex flex-wrap gap-2">
-                    <Badge bg="light" text="dark" className="border">
+                  <div className="d-flex flex-wrap gap-2 justify-content-end">
+                    <Badge bg="light" text="dark" className="border fw-normal">
                       {formatLogicSubjects(logic)} in DB: {subjectAvailability.mcq}{" "}
                       MCQ · {subjectAvailability.coding} Coding (
                       {subjectAvailability.total} total)
                     </Badge>
                     {logic.subtopicRules.length > 0 && (
-                      <Badge bg="info" text="dark">
+                      <Badge bg="info" text="dark" className="fw-normal">
                         Selected scope in DB: {scopeAvailability.mcq} MCQ ·{" "}
                         {scopeAvailability.coding} Coding (
                         {scopeAvailability.total} total)
@@ -413,31 +490,52 @@ export default function QuestionConfigModal({
                       : "Select topics to configure question counts per subtopic."}
                   </div>
                 ) : (
-                  <Table size="sm" bordered responsive className="mb-0 align-middle">
+                  <div className="table-responsive border rounded">
+                  <Table
+                    size="sm"
+                    bordered
+                    className="mb-0 align-middle selection-logic-table"
+                  >
                     <thead className="table-light">
                       <tr>
-                        {allowMultiSubject && <th rowSpan={2}>Subject</th>}
-                        <th rowSpan={2}>Topic</th>
-                        <th rowSpan={2}>Subtopic</th>
-                        <th rowSpan={2}>Level</th>
-                        <th colSpan={2} className="text-center">
+                        {allowMultiSubject && (
+                          <th rowSpan={2} className="align-middle">
+                            Subject
+                          </th>
+                        )}
+                        <th rowSpan={2} className="align-middle">
+                          Topic
+                        </th>
+                        <th rowSpan={2} className="align-middle">
+                          Subtopic
+                        </th>
+                        <th rowSpan={2} className="align-middle">
+                          Level
+                        </th>
+                        <th colSpan={2} className="text-center border-start">
                           MCQ
                         </th>
-                        <th colSpan={2} className="text-center">
+                        <th colSpan={2} className="text-center border-start">
                           Coding
                         </th>
                       </tr>
                       <tr>
-                        <th className="text-center" style={{ width: 72 }}>
+                        <th
+                          className="text-center small fw-semibold border-start"
+                          style={{ width: 88 }}
+                        >
                           Selected
                         </th>
-                        <th className="text-center" style={{ width: 56 }}>
+                        <th className="text-center small fw-semibold" style={{ width: 72 }}>
                           Available
                         </th>
-                        <th className="text-center" style={{ width: 72 }}>
+                        <th
+                          className="text-center small fw-semibold border-start"
+                          style={{ width: 88 }}
+                        >
                           Selected
                         </th>
-                        <th className="text-center" style={{ width: 56 }}>
+                        <th className="text-center small fw-semibold" style={{ width: 72 }}>
                           Available
                         </th>
                       </tr>
@@ -494,13 +592,14 @@ export default function QuestionConfigModal({
                                   {levelMeta?.label ?? `Level ${level}`}
                                 </span>
                               </td>
-                              <td>
+                              <td className="p-1 text-center">
                                 <Form.Control
                                   type="number"
                                   size="sm"
                                   min={0}
                                   max={available.mcq}
                                   value={levelRule.mcqCount}
+                                  className="text-center mx-auto selection-logic-input"
                                   onChange={(e) =>
                                     updateSubtopicLevelCount(
                                       rule.subtopic,
@@ -520,13 +619,14 @@ export default function QuestionConfigModal({
                                   {available.mcq}
                                 </Badge>
                               </td>
-                              <td>
+                              <td className="p-1 text-center">
                                 <Form.Control
                                   type="number"
                                   size="sm"
                                   min={0}
                                   max={available.coding}
                                   value={levelRule.codingCount}
+                                  className="text-center mx-auto selection-logic-input"
                                   onChange={(e) =>
                                     updateSubtopicLevelCount(
                                       rule.subtopic,
@@ -557,11 +657,11 @@ export default function QuestionConfigModal({
                       <tr>
                         <td
                           colSpan={allowMultiSubject ? 4 : 3}
-                          className="fw-semibold small"
+                          className="fw-semibold small align-middle"
                         >
                           Total to assign
                         </td>
-                        <td className="text-center">
+                        <td className="text-center align-middle border-start">
                           <Badge bg="primary">
                             {logic.subtopicRules.reduce(
                               (total, rule) => total + getRuleMcqTotal(rule),
@@ -569,10 +669,10 @@ export default function QuestionConfigModal({
                             )}
                           </Badge>
                         </td>
-                        <td className="text-center">
+                        <td className="text-center align-middle">
                           <Badge bg="secondary">{scopeAvailability.mcq}</Badge>
                         </td>
-                        <td className="text-center">
+                        <td className="text-center align-middle border-start">
                           <Badge bg="primary">
                             {logic.subtopicRules.reduce(
                               (total, rule) => total + getRuleCodingTotal(rule),
@@ -580,37 +680,29 @@ export default function QuestionConfigModal({
                             )}
                           </Badge>
                         </td>
-                        <td className="text-center">
+                        <td className="text-center align-middle">
                           <Badge bg="secondary">{scopeAvailability.coding}</Badge>
                         </td>
                       </tr>
                     </tfoot>
                   </Table>
+                  </div>
                 )}
-                <div className="text-muted small mt-2">
-                  Target to assign: {summarizeSubtopicRules(logic)} (
-                  {getTotalQuestionTarget(logic)} total) · Available in DB for
-                  selected scope: {scopeAvailability.mcq} MCQ ·{" "}
-                  {scopeAvailability.coding} Coding ({scopeAvailability.total}{" "}
+                <div className="bg-light rounded-3 border small text-muted mt-3 px-3 py-2">
+                  <span className="fw-semibold text-dark">Target to assign:</span>{" "}
+                  {summarizeSubtopicRules(logic)} ({getTotalQuestionTarget(logic)}{" "}
                   total)
+                  <span className="mx-2">·</span>
+                  <span className="fw-semibold text-dark">Available in DB</span> for
+                  selected scope: {scopeAvailability.mcq} MCQ ·{" "}
+                  {scopeAvailability.coding} Coding ({scopeAvailability.total} total)
                 </div>
-              </div>
-
-              <div className="d-flex flex-wrap gap-2 mt-3">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={!canSave}
-                  onClick={handleSaveLogic}
-                >
-                  Save Logic
-                </Button>
               </div>
             </div>
           </div>
       </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={onHide}>
+      <Modal.Footer className="border-top bg-white">
+        <Button variant="outline-secondary" onClick={onHide}>
           Close
         </Button>
         <Button

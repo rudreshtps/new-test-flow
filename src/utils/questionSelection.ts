@@ -137,10 +137,15 @@ export function getSwapCandidates(
   );
   if (!current) return [];
 
-  return filterQuestionPool(logic).filter(
+  const subjects = getLogicSubjects(logic);
+  if (!subjects.includes(current.subject)) return [];
+
+  return QUESTION_BANK.filter(
     (question) =>
+      question.subject === current.subject &&
       question.subtopic === current.subtopic &&
       question.type === current.type &&
+      question.level === current.level &&
       question.id !== currentQuestionId &&
       !assignedQuestionIds.includes(question.id)
   );

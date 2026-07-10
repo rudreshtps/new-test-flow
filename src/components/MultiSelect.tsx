@@ -55,23 +55,21 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   });
 
   return (
-    <Dropdown className="w-100" autoClose="outside" style={{ position: "relative" }}>
+    <Dropdown className="w-100 multi-select" autoClose="outside">
       <Dropdown.Toggle
         variant="outline-secondary"
-        className="w-100 d-flex justify-content-between align-items-center"
+        className="w-100 multi-select-toggle text-start d-flex align-items-center justify-content-between"
         disabled={disabled}
       >
-        <span className="text-truncate" style={{ maxWidth: "85%" }}>
+        <span className="text-truncate flex-grow-1 pe-2">
           {renderToggleText()}
         </span>
       </Dropdown.Toggle>
       <Dropdown.Menu
-        className="w-100 p-2"
+        className="w-100 p-2 multi-select-menu"
         style={{
           maxHeight: maxMenuHeight,
           overflowY: "auto",
-          zIndex: 1050,
-          position: "absolute",
         }}
       >
         {options.length === 0 && (

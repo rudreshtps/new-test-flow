@@ -1,0 +1,46 @@
+.roadmap-button {
+  background: linear-gradient(135deg, #3f48fd, #444dfa);
+  border: none;
+  color: #ffffff;
+  border-radius: 10px;
+  padding: 5px 25px;
+  transition: background 0.2s ease-in-out;
+}
+
+.roadmap-button:disabled {
+  opacity: 0.75;
+}
+
+.ace_dreamweaver .ace_gutter {
+  background: #ffffff;
+  color: #333;
+}
+
+.ace_dreamweaver .ace_gutter .ace_gutter-active-line {
+  background: #ffffff;
+}
+
+.nav-link.custom-tab {
+  margin-bottom: 10px;
+  box-shadow: #888 1px 2px 5px 0px;
+  background-color: transparent;
+  color: black;
+}
+
+.nav-link.custom-tab.active {
+  background-color: black;
+  color: white;
+}
+
+.trainer-preview-shell {
+  height: min(72vh, 720px);
+  min-height: 480px;
+}
+
+.trainer-preview-shell .processingDivButton {
+  white-space: nowrap;
+  font-size: 12px;
+  min-width: 70px;
+  box-shadow: #888 1px 2px 5px 0px;
+  height: 30px;
+}
