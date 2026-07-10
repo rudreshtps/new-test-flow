@@ -4,6 +4,7 @@ import {
   getRuleCodingTotal,
   getRuleMcqTotal,
 } from "../data/questionBank";
+import { isQuestionExcludedFromSelection } from "../data/questionFlagData";
 import type { Question, QuestionSelectionLogic } from "../types";
 import {
   getLogicSubjects,
@@ -60,6 +61,7 @@ export function filterQuestionPool(logic: QuestionSelectionLogic): Question[] {
     ) {
       return false;
     }
+    if (isQuestionExcludedFromSelection(question.id)) return false;
     return true;
   });
 }
@@ -107,19 +109,30 @@ export function generateQuestionsFromLogic(
             question.level === level &&
             question.type === type &&
             !excludeIds.includes(question.id) &&
+            !isQuestionExcludedFromSelection(question.id) &&
             !selected.some((picked) => picked.id === question.id)
         );
 
         const picks = shuffle(pool).slice(0, count);
         if (picks.length < count) {
+          const flaggedNote = pool.length < count ? " (some excluded — flagged)" : "";
           warnings.push(
-            `${ruleSubject} · ${rule.subtopic} L${level} (${type}): only ${picks.length} of ${count} questions available.`
+            `${ruleSubject} · ${rule.subtopic} L${level} (${type}): only ${picks.length} of ${count} questions available${flaggedNote}.`
           );
         }
         selected.push(...picks);
       });
     });
   });
+
+  const flaggedSkipped = QUESTION_BANK.filter((q) =>
+    isQuestionExcludedFromSelection(q.id)
+  ).length;
+  if (flaggedSkipped > 0) {
+    warnings.push(
+      `${flaggedSkipped} question(s) in bank excluded — flagged until fixed.`
+    );
+  }
 
   return {
     questionIds: selected.map((question) => question.id),
@@ -147,6 +160,47 @@ export function getSwapCandidates(
       question.type === current.type &&
       question.level === current.level &&
       question.id !== currentQuestionId &&
-      !assignedQuestionIds.includes(question.id)
+      !assignedQuestionIds.includes(question.id) &&
+      !isQuestionExcludedFromSelection(question.id)
   );
+}
+
+export function replaceFlaggedQuestionInSet(
+  logic: QuestionSelectionLogic,
+  questionIds: string[],
+  flaggedQuestionId: string
+): { questionIds: string[]; notice: string } {
+  const candidates = getSwapCandidates(logic, flaggedQuestionId, questionIds);
+  if (candidates.length === 0) {
+    return {
+      questionIds: questionIds.filter((id) => id !== flaggedQuestionId),
+      notice: `${flaggedQuestionId} flagged and removed from this set — no replacement available. Regenerate or adjust logic.`,
+    };
+  }
+
+  const replacement =
+    candidates[Math.floor(Math.random() * candidates.length)];
+  return {
+    questionIds: questionIds.map((id) =>
+      id === flaggedQuestionId ? replacement.id : id
+    ),
+    notice: `${flaggedQuestionId} flagged — replaced with ${replacement.id} for this schedule.`,
+  };
+}
+
+export function purgeExcludedQuestionsFromSet(
+  logic: QuestionSelectionLogic,
+  questionIds: string[]
+): { questionIds: string[]; notices: string[] } {
+  let nextIds = [...questionIds];
+  const notices: string[] = [];
+
+  questionIds.forEach((id) => {
+    if (!isQuestionExcludedFromSelection(id)) return;
+    const result = replaceFlaggedQuestionInSet(logic, nextIds, id);
+    nextIds = result.questionIds;
+    notices.push(result.notice);
+  });
+
+  return { questionIds: nextIds, notices };
 }

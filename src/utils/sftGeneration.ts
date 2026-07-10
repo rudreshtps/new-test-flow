@@ -1,5 +1,5 @@
 import { QUESTION_BANK } from "../data/questionBank";
-import { isQuestionDisabled } from "../data/questionFlagData";
+import { isQuestionExcludedFromSelection } from "../data/questionFlagData";
 import type { LevelRule, Question, QuestionSelectionLogic } from "../types";
 
 function shuffle<T>(items: T[]): T[] {
@@ -31,13 +31,15 @@ function pickWithRepeatFallback(
   label: string,
   warnings: string[]
 ): Question[] {
-  const available = pool.filter((q) => !usedIds.has(q.id) && !isQuestionDisabled(q.id));
+  const available = pool.filter(
+    (q) => !usedIds.has(q.id) && !isQuestionExcludedFromSelection(q.id)
+  );
   const picks: Question[] = shuffle(available).slice(0, count);
 
   if (picks.length < count) {
     const shortfall = count - picks.length;
     const repeatPool = pool.filter(
-      (q) => !picks.some((p) => p.id === q.id) && !isQuestionDisabled(q.id)
+      (q) => !picks.some((p) => p.id === q.id) && !isQuestionExcludedFromSelection(q.id)
     );
     const repeats = shuffle(repeatPool).slice(0, shortfall);
     repeats.forEach((q) => {
@@ -85,12 +87,12 @@ export function generateQuestionsFromLevelRules(
     selected.push(...picks);
   });
 
-  const disabledSkipped = QUESTION_BANK.filter(
-    (q) => q.subject === subject && isQuestionDisabled(q.id)
+  const flaggedSkipped = QUESTION_BANK.filter(
+    (q) => q.subject === subject && isQuestionExcludedFromSelection(q.id)
   ).length;
-  if (disabledSkipped > 0) {
+  if (flaggedSkipped > 0) {
     warnings.push(
-      `${disabledSkipped} question(s) in bank excluded — flagged and disabled.`
+      `${flaggedSkipped} question(s) in bank excluded — flagged until fixed.`
     );
   }
 

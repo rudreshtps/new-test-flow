@@ -1339,11 +1339,12 @@ const AssignTestDetail = () => {
               }
             : null
         }
-        showFlagAction={isSubjectFinalTest}
-        onFlagQuestion={(questionId) => {
+        onFlagged={(result) => {
           setActionAlert({
             variant: "info",
-            message: `Question ${questionId} flagged — Admin, Head Trainer, and Content Creator notified.`,
+            message: `Question ${result.questionId} flagged — Admin, Head Trainer, and Content Creator notified.${
+              result.disabled ? " Disabled until fixed." : ""
+            }`,
           });
         }}
         warnings={generationWarnings}

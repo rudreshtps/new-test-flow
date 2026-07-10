@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Badge, Button, Modal } from "react-bootstrap";
+import { isQuestionFlagged } from "../data/questionFlagData";
 import {
   buildStudentMcqQuestion,
   buildStudentPythonQuestion,
@@ -15,11 +16,13 @@ import "../styles/StudentEditor.css";
 type QuestionTrainerPreviewModalProps = {
   questionId: string | null;
   onHide: () => void;
+  onFlagQuestion?: (questionId: string) => void;
 };
 
 export default function QuestionTrainerPreviewModal({
   questionId,
   onHide,
+  onFlagQuestion,
 }: QuestionTrainerPreviewModalProps) {
   const question = questionId ? getQuestionById(questionId) : null;
   const editorKind = questionId ? getStudentEditorKind(questionId) : null;
@@ -77,6 +80,16 @@ export default function QuestionTrainerPreviewModal({
         {pythonQuestion && <PythonTrainerPreview question={pythonQuestion} />}
       </Modal.Body>
       <Modal.Footer>
+        {questionId && onFlagQuestion && (
+          <Button
+            variant="outline-warning"
+            className="me-auto"
+            disabled={isQuestionFlagged(questionId)}
+            onClick={() => onFlagQuestion(questionId)}
+          >
+            {isQuestionFlagged(questionId) ? "Already Flagged" : "Flag Question"}
+          </Button>
+        )}
         <Button variant="secondary" onClick={onHide}>
           Close
         </Button>

@@ -53,6 +53,20 @@ export function flagQuestion(questionId: string, flaggedBy: string): FlaggedQues
   return entry;
 }
 
+export function isQuestionFlagged(questionId: string): boolean {
+  return loadFlaggedQuestions().some((q) => q.questionId === questionId);
+}
+
 export function isQuestionDisabled(questionId: string): boolean {
   return loadFlaggedQuestions().some((q) => q.questionId === questionId && q.disabled);
+}
+
+/** Flagged questions stay out of generation/swap until resolved. */
+export function isQuestionExcludedFromSelection(questionId: string): boolean {
+  return isQuestionFlagged(questionId);
+}
+
+export function resolveFlaggedQuestion(questionId: string): void {
+  const remaining = loadFlaggedQuestions().filter((q) => q.questionId !== questionId);
+  sessionStorage.setItem(FLAGGED_KEY, JSON.stringify(remaining));
 }
