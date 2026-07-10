@@ -9,6 +9,7 @@ export type TriggeredTestRow = {
   status: "Scheduled" | "Live" | "Completed";
   course: string;
   batch: string;
+  durationMinutes: number;
 };
 
 export type CompletedTestRow = {
@@ -42,6 +43,7 @@ export const MOCK_TRIGGERED_TESTS: TriggeredTestRow[] = [
     status: "Scheduled",
     course: "12M 2026",
     batch: "Batch-01",
+    durationMinutes: 120,
   },
   {
     id: "trg-2",
@@ -54,6 +56,7 @@ export const MOCK_TRIGGERED_TESTS: TriggeredTestRow[] = [
     status: "Live",
     course: "12M 2026",
     batch: "Batch-03",
+    durationMinutes: 90,
   },
 ];
 

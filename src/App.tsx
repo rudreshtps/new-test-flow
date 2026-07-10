@@ -6,6 +6,7 @@ import AssignTestScreen from "./screens/AssignTestScreen";
 import TriggeredTestsScreen from "./screens/TriggeredTestsScreen";
 import CompletedTestsScreen from "./screens/CompletedTestsScreen";
 import TestReportScreen from "./screens/TestReportScreen";
+import AttendanceScreen from "./screens/AttendanceScreen";
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="assign-test" element={<AssignTestListScreen />} />
         <Route path="assign-test/:testId" element={<AssignTestScreen />} />
         <Route path="triggered-tests" element={<TriggeredTestsScreen />} />
+        <Route path="attendance/:sessionId" element={<AttendanceScreen />} />
         <Route path="completed-tests" element={<CompletedTestsScreen />} />
         <Route path="test-reports" element={<TestReportScreen />} />
         <Route path="test-reports/:reportId" element={<TestReportScreen />} />

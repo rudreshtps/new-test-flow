@@ -18,6 +18,7 @@ import {
   BsClock,
   BsJournalText,
   BsPeople,
+  BsPersonCheck,
   BsShieldCheck,
   BsShuffle,
 } from "react-icons/bs";
@@ -26,6 +27,7 @@ import { LuPlus } from "react-icons/lu";
 import { VscListFlat } from "react-icons/vsc";
 import TestFilterSelect from "../components/TestFilterSelect";
 import GeneratedQuestionsReviewModal from "../components/GeneratedQuestionsReviewModal";
+import AttendanceLaunchModal from "../components/AttendanceLaunchModal";
 import QuestionConfigModal from "../components/QuestionConfigModal";
 import TestPageShell from "../components/TestPageShell";
 import {
@@ -43,6 +45,9 @@ import {
   type BatchStudent,
   type TestBatchAssignment,
 } from "../constants/assignTestConstants";
+import {
+  createAttendanceSession,
+} from "../data/attendanceMockData";
 import {
   DEFAULT_LEVEL_RULES,
   getQuestionSetForTime,
@@ -82,10 +87,14 @@ function scheduleKey(batch: TestBatchAssignment): string {
 function BatchRow({
   batch,
   onAssignStudents,
+  onLaunchAttendance,
+  canLaunchAttendance,
   onRemove,
 }: {
   batch: TestBatchAssignment;
   onAssignStudents: () => void;
+  onLaunchAttendance: () => void;
+  canLaunchAttendance: boolean;
   onRemove: () => void;
 }) {
   return (
@@ -113,6 +122,21 @@ function BatchRow({
           onClick={onAssignStudents}
         >
           <BsPeople />
+        </Button>
+        <Button
+          variant={canLaunchAttendance ? "primary" : "outline-secondary"}
+          size="sm"
+          className="p-0 d-inline-flex align-items-center justify-content-center"
+          style={iconButtonStyle}
+          title={
+            canLaunchAttendance
+              ? "Launch attendance for this batch slot"
+              : "Schedule slot, confirm questions, and assign students to launch attendance"
+          }
+          disabled={!canLaunchAttendance}
+          onClick={onLaunchAttendance}
+        >
+          <BsPersonCheck />
         </Button>
         <Button
           variant="outline-danger"
@@ -144,8 +168,12 @@ type ScheduleGroupBoxProps = {
   assignStatus?: SlotAssignStatus;
   canAssignTest?: boolean;
   canTriggerTest?: boolean;
+  canLaunchAttendance?: boolean;
+  slotAttendanceReady?: boolean;
   onAssignTest?: () => void;
   onTriggerTest?: () => void;
+  onLaunchAttendance?: () => void;
+  onLaunchAttendanceForBatch: (batch: TestBatchAssignment) => void;
   onAssignStudents: (batch: TestBatchAssignment) => void;
   onOpenSchedule: () => void;
   onOpenSecurity: () => void;
@@ -169,8 +197,12 @@ function ScheduleGroupBox({
   assignStatus = "draft",
   canAssignTest = false,
   canTriggerTest = false,
+  canLaunchAttendance = false,
+  slotAttendanceReady = false,
   onAssignTest,
   onTriggerTest,
+  onLaunchAttendance,
+  onLaunchAttendanceForBatch,
   onAssignStudents,
   onOpenSchedule,
   onOpenSecurity,
@@ -334,6 +366,17 @@ function ScheduleGroupBox({
                 >
                   Trigger
                 </Button>
+                {(slotAttendanceReady ||
+                  (canLaunchAttendance && assignStatus === "live")) && (
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={onLaunchAttendance}
+                    title="Launch attendance for all batches in this slot"
+                  >
+                    Launch Attendance
+                  </Button>
+                )}
                 {assignStatus !== "draft" && (
                   <Badge
                     bg={
@@ -368,6 +411,10 @@ function ScheduleGroupBox({
               key={batch.batch_id}
               batch={batch}
               onAssignStudents={() => onAssignStudents(batch)}
+              canLaunchAttendance={
+                slotAttendanceReady && batch.studentCount > 0
+              }
+              onLaunchAttendance={() => onLaunchAttendanceForBatch?.(batch)}
               onRemove={() => onRemove(batch.batch_id)}
             />
           ))}
@@ -637,6 +684,10 @@ const AssignTestDetail = () => {
   const [showQuestionsModal, setShowQuestionsModal] = useState(false);
   const [showGeneratedQuestionsModal, setShowGeneratedQuestionsModal] =
     useState(false);
+  const [attendanceLaunchTarget, setAttendanceLaunchTarget] = useState<{
+    groupKey: string;
+    batchId?: string;
+  } | null>(null);
   const [generationWarnings, setGenerationWarnings] = useState<string[]>([]);
   const [activeScheduleKey, setActiveScheduleKey] = useState<string | null>(null);
   const [testQuestionLogic, setTestQuestionLogic] =
@@ -955,8 +1006,60 @@ const AssignTestDetail = () => {
     }));
     setActionAlert({
       variant: "info",
-      message: `Test triggered at ${time}. Students can now begin.`,
+      message: `Test triggered at ${time}. Launch attendance when students are ready.`,
     });
+  };
+
+  const attendanceLaunchGroup = scheduleGroups.find(
+    (group) => group.key === attendanceLaunchTarget?.groupKey
+  );
+
+  const attendanceLaunchBatches = useMemo(() => {
+    if (!attendanceLaunchGroup) return [];
+    if (!attendanceLaunchTarget?.batchId) {
+      return attendanceLaunchGroup.batches;
+    }
+    return attendanceLaunchGroup.batches.filter(
+      (batch) => batch.batch_id === attendanceLaunchTarget.batchId
+    );
+  }, [attendanceLaunchGroup, attendanceLaunchTarget?.batchId]);
+
+  const attendanceLaunchStudentCount = useMemo(
+    () =>
+      attendanceLaunchBatches.reduce((total, batch) => total + batch.studentCount, 0),
+    [attendanceLaunchBatches]
+  );
+
+  const isSlotAttendanceReady = (
+    group: (typeof scheduleGroups)[number],
+    questionsConfirmed: boolean
+  ) =>
+    Boolean(group.date && group.time && questionsConfirmed);
+
+  const handleAttendanceLaunch = (groupSizes: number[]) => {
+    if (!test || !attendanceLaunchGroup || attendanceLaunchBatches.length === 0) {
+      return;
+    }
+
+    const batchNames = attendanceLaunchBatches.map((batch) => batch.batch_name);
+    const session = createAttendanceSession(
+      {
+        id: `assign-${test.id}-${attendanceLaunchGroup.key}${
+          attendanceLaunchTarget?.batchId ? `-${attendanceLaunchTarget.batchId}` : ""
+        }`,
+        testName: test.name,
+        trainerName: "Trainer",
+        course: test.course ?? attendanceLaunchBatches[0]?.course_name ?? "Course",
+        batch: batchNames.join(", "),
+        batchNames,
+        durationMinutes: displayDuration ?? 120,
+        totalStudents: attendanceLaunchStudentCount,
+      },
+      groupSizes
+    );
+
+    setAttendanceLaunchTarget(null);
+    navigate(`/attendance/${session.id}`);
   };
 
   const canAssignGroup = (groupKey: string) => {
@@ -1256,8 +1359,19 @@ const AssignTestDetail = () => {
               assignStatus={meta.assignStatus}
               canAssignTest={canAssignGroup(group.key)}
               canTriggerTest={canTriggerGroup(group.key)}
+              canLaunchAttendance={isSubjectFinalTest}
+              slotAttendanceReady={isSlotAttendanceReady(group, meta.questionsConfirmed)}
               onAssignTest={() => assignTestToGroup(group.key)}
               onTriggerTest={() => triggerTestForGroup(group.key)}
+              onLaunchAttendance={() =>
+                setAttendanceLaunchTarget({ groupKey: group.key })
+              }
+              onLaunchAttendanceForBatch={(batch) =>
+                setAttendanceLaunchTarget({
+                  groupKey: group.key,
+                  batchId: batch.batch_id,
+                })
+              }
               onAssignStudents={openStudents}
               onOpenSchedule={() => openScheduleForGroup(group.batches)}
               onOpenSecurity={() => openSecurityForGroup(group.batches)}
@@ -1355,6 +1469,15 @@ const AssignTestDetail = () => {
         onConfirm={(questionIds) => {
           if (activeScheduleKey) saveQuestionConfig(questionIds, activeScheduleKey);
         }}
+      />
+
+      <AttendanceLaunchModal
+        show={Boolean(attendanceLaunchGroup && attendanceLaunchBatches.length > 0)}
+        testName={test.name}
+        batch={attendanceLaunchBatches.map((batch) => batch.batch_name).join(", ")}
+        totalStudents={attendanceLaunchStudentCount}
+        onHide={() => setAttendanceLaunchTarget(null)}
+        onLaunch={handleAttendanceLaunch}
       />
 
       <StudentsManageModal

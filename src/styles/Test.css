@@ -108,6 +108,99 @@
   text-decoration: underline !important;
 }
 
+.trainer-shown-image {
+  width: 180px;
+  height: 180px;
+  border: 4px solid #4168a3;
+  border-radius: 12px;
+  object-fit: contain;
+  background-color: #ffffff;
+}
+
+.group-card {
+  border: none;
+  border-left: 4px solid #4168a3;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.preview-images-grid {
+  background-color: #ffffff;
+  padding: 1rem;
+}
+
+.preview-group-image {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  background-color: #ffffff;
+}
+
+.attendance-screen .attendance-shape-token {
+  width: 120px;
+  height: 120px;
+  border-radius: 16px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: #00000033 0 8px 16px;
+}
+
+.attendance-screen .attendance-shape-token span {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.attendance-screen .attendance-shape-token small {
+  margin-top: 0.35rem;
+  font-weight: 600;
+}
+
+.status-present {
+  color: #198754;
+  font-weight: 700;
+}
+
+.status-absent {
+  color: #dc3545;
+  font-weight: 700;
+}
+
+.data-grid-container {
+  width: 100%;
+  height: 500px;
+}
+
+.data-grid-container .MuiDataGrid-root {
+  border: none;
+}
+
+.data-grid-container .MuiDataGrid-columnHeaderTitle {
+  font-weight: 700;
+  color: #000000 !important;
+}
+
+.attendance-summary-bar {
+  background-color: #e8f0fc;
+  border-left: 4px solid #4168a3;
+  font-size: 0.9rem;
+}
+
+.btn-outline-brand {
+  color: #4168a3;
+  border-color: #4168a3;
+}
+
+.btn-outline-brand:hover,
+.btn-outline-brand:focus {
+  background-color: #4168a3;
+  border-color: #4168a3;
+  color: #ffffff;
+}
+
 .selection-logic-filter-label {
   min-height: 24px;
 }

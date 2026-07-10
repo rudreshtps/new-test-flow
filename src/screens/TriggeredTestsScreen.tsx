@@ -1,9 +1,28 @@
-import { Badge, Table } from "react-bootstrap";
+import { useState } from "react";
+import { Badge, Button, Table } from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
+import AttendanceLaunchModal from "../components/AttendanceLaunchModal";
 import TestPageShell from "../components/TestPageShell";
-import { MOCK_TRIGGERED_TESTS } from "../data/sftMockData";
 import { formatAssignDate, formatAssignTime } from "../constants/assignTestConstants";
+import {
+  createAttendanceSession,
+  getStudentCountForBatch,
+  toLaunchContext,
+} from "../data/attendanceMockData";
+import { MOCK_TRIGGERED_TESTS } from "../data/sftMockData";
+import type { TriggeredTestRow } from "../data/sftMockData";
 
 export default function TriggeredTestsScreen() {
+  const navigate = useNavigate();
+  const [launchRow, setLaunchRow] = useState<TriggeredTestRow | null>(null);
+
+  const handleLaunch = (groupSizes: number[]) => {
+    if (!launchRow) return;
+    const session = createAttendanceSession(toLaunchContext(launchRow), groupSizes);
+    setLaunchRow(null);
+    navigate(`/attendance/${session.id}`);
+  };
+
   return (
     <TestPageShell>
       <div className="overflow-auto px-4 py-3" style={{ height: "calc(100vh - 150px)" }}>
@@ -21,6 +40,7 @@ export default function TriggeredTestsScreen() {
                   <th>Triggered</th>
                   <th>Course / Batch</th>
                   <th>Status</th>
+                  <th className="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -54,6 +74,17 @@ export default function TriggeredTestsScreen() {
                         {row.status}
                       </Badge>
                     </td>
+                    <td className="text-end">
+                      {row.status !== "Completed" && (
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => setLaunchRow(row)}
+                        >
+                          Launch Attendance
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -61,6 +92,17 @@ export default function TriggeredTestsScreen() {
           </div>
         </div>
       </div>
+
+      <AttendanceLaunchModal
+        show={Boolean(launchRow)}
+        testName={launchRow?.testName ?? ""}
+        batch={launchRow?.batch ?? ""}
+        totalStudents={
+          launchRow ? getStudentCountForBatch(launchRow.batch) : 0
+        }
+        onHide={() => setLaunchRow(null)}
+        onLaunch={handleLaunch}
+      />
     </TestPageShell>
   );
 }
